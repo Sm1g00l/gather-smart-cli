@@ -22,6 +22,7 @@ gather-setup = "gather_cli.setup:setup"
 gather-bot = "gather_cli.bot:cli"
 gather-light = "gather_cli.light:cli"
 gather-inbox = "gather_cli.inbox:cli"
+gather-test = "gather_cli.test_all:cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]

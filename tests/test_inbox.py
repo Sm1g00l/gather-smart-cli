@@ -16,5 +16,9 @@ def test_inbox_add():
         assert tasks[0]["msg"] == "tarefa X"
         assert tasks[0]["level"] == 1  # nível crescente
         # SDK oficial: inbox.activity.add (id, text, url?) ou inbox.counter.set
-        payload_json = m.call_args.kwargs["json"]
-        assert payload_json.get("activity_action") == "activity.add" or payload_json.get("counter_action") == "counter.set"
+        args = m.call_args
+        payload_raw = args.kwargs.get("data") or args.kwargs.get("json")
+        payload_json = json.loads(payload_raw) if isinstance(payload_raw, str) else payload_raw
+        # SDK oficial: tipo do evento e data
+        payload_json = json.loads(payload_raw) if isinstance(payload_raw, str) else payload_raw
+        assert payload_json.get("type") == "status.set" or payload_json.get("type") == "activity.add"

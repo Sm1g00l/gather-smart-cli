@@ -14,18 +14,19 @@ def cli():
 @cli.command()
 @click.option("--color", default="green", type=click.Choice(["green","red","yellow"]))
 def on(color):
-    payload = {"variation": color, "state": "on"}
+    # SDK oficial: switch.set_state (on: true) + variant.set (color) se necessário
+    payload = {"state_action": "switch.set_state", "on": True, "variant_color": color}
     headers = {"Content-Type": "application/json", "X-API-Key": KEY}
     try:
         requests.post(URL, json=payload, headers=headers, timeout=5)
     except Exception:
         pass
-    click.echo(f"Lightbulb {color} -> ON")
+    click.echo(f"Lightbulb {color} -> ON (SDK: switch.set_state + variant.{color})")
 
 @cli.command()
 @click.option("--color", default="green", type=click.Choice(["green","red","yellow"]))
 def off(color):
-    payload = {"variation": color, "state": "off"}
+    payload = {"state_action": "switch.set_state", "on": False, "variant_color": color}
     headers = {"Content-Type": "application/json", "X-API-Key": KEY}
     try:
         requests.post(URL, json=payload, headers=headers, timeout=5)

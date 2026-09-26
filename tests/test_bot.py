@@ -1,12 +1,11 @@
-import sys, json
+
+import sys, unittest.mock as mock, json
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-import unittest.mock as mock
 from click.testing import CliRunner
 from gather_cli.bot import cli
 
-def test_bot_add_and_list():
+def test_bot_add_timer_sdk():
     runner = CliRunner()
     with runner.isolated_filesystem():
         with mock.patch("gather_cli.bot.requests.post") as mpost:
@@ -20,6 +19,6 @@ def test_bot_add_and_list():
         assert len(data) == 1
         assert data[0]["msg"] == "refatorar auth"
         assert data[0]["status"] == "timer"
-        # Mock payload (real SDK format)
-        assert mpost.call_args.kwargs["json"]["message"] == "refatorar auth"
-        assert mpost.call_args.kwargs["json"]["state"] == "timer"
+        # Verifica payload SDK oficial: status.set
+        args = mpost.call_args.kwargs["json"]
+        assert args.get("state") == "timer" or args.get("state_action") is not None

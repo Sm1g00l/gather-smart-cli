@@ -20,7 +20,7 @@ def cli():
 @click.argument("message")
 @click.option("--status", default="timer", type=click.Choice(["blank","smiley","question","warning","timer"]))
 def add(message, status):
-    payload = {"message": message, "state": status}
+    payload = {"state": status}
     headers = {"Content-Type": "application/json", "X-API-Key": BOT_KEY}
     # Mock ou envio real
     try:

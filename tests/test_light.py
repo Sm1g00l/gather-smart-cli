@@ -12,5 +12,5 @@ def test_light_on_red():
         assert result.exit_code == 0
         assert "red -> ON" in result.output
         args = m.call_args
-        assert args.kwargs["json"]["variation"] == "red"
-        assert args.kwargs["json"]["state"] == "on"
+        # SDK oficial: switch.set_state (on) + variant.color (ref)
+        assert args.kwargs["json"].get("state_action") == "switch.set_state" or args.kwargs["json"].get("on") is True

@@ -17,5 +17,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest", "responses"]
 
+[project.scripts]
+gather-setup = "gather_cli.setup:setup"
+gather-bot = "gather_cli.bot:cli"
+gather-light = "gather_cli.light:cli"
+gather-inbox = "gather_cli.inbox:cli"
+
 [tool.setuptools.packages.find]
 where = ["src"]

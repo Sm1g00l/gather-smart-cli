@@ -76,7 +76,7 @@ gather-bot clear                                       # limpa as mensagens do b
 ```bash
 gather-light on --color green   # livre / focado
 gather-light on --color red     # em reunião / não perturbe
-gather-light on --color yellow  # ausente / almoço
+gather-light on --color orange  # ausente / almoço
 gather-light off --color green  # desliga
 ```
 
@@ -86,6 +86,16 @@ gather-inbox add "revisar PR #42"
 gather-inbox set --level 3
 gather-inbox list
 ```
+
+---
+
+## 🧪 Testes
+```bash
+pytest                           # unitários (mockados), não tocam no Gather
+GATHER_E2E=1 pytest -m e2e -v    # ponta a ponta contra os Smart Objects reais do .env
+```
+O e2e tira um snapshot dos 3 objetos, exercita todos os comandos e restaura o estado original no fim (e confere).
+Faz ~45 requisições: rodar duas vezes seguidas bate no limite de 60/min (o teste espera o `429` liberar).
 
 ---
 

@@ -26,3 +26,5 @@ gather-test = "gather_cli.test_all:cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+[tool.pytest.ini_options]
+markers = ["e2e: testes contra os Smart Objects reais do Gather (GATHER_E2E=1)"]

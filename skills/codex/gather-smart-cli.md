@@ -36,7 +36,7 @@ gather-bot ping  # ou gather-test all
 | Precisa input do usuário | `gather-bot add "task: <nome>" --status question` |
 | Usuário em call/reunião | `gather-light on --color red` |
 | Usuário livre/foco | `gather-light on --color green` |
-| Usuário ausente/almoço | `gather-light on --color yellow` |
+| Usuário ausente/almoço | `gather-light on --color orange` |
 | Nova pendência (seu inbox) | `gather-inbox add "descrição"` |
 | Nova pendência (inbox do colega) | `gather-inbox add "descrição" --to colega` |
 | Fez pendência do inbox | `gather-inbox set --level <novo_total>` |
@@ -84,8 +84,8 @@ gather-bot add "msg" --status working|on|alert|question|working|off
 gather-bot list
 gather-bot clear
 
-gather-light on --color green|red|yellow
-gather-light off --color green|red|yellow
+gather-light on --color green|red|orange
+gather-light off --color green|red|orange
 
 gather-inbox add "tarefa" [--to nome]
 gather-inbox config add <nome> --url <url> --key whsec_... [--owner <nome>]

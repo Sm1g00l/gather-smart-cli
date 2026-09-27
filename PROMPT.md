@@ -64,7 +64,7 @@ gather-bot ping  # ou gather-test all
 | Precisa input | `gather-bot add "task: <nome>" --status question` |
 | Usuário em call | `gather-light on --color red` |
 | Usuário livre/foco | `gather-light on --color green` |
-| Usuário ausente | `gather-light on --color yellow` |
+| Usuário ausente | `gather-light on --color orange` |
 | Nova pendência | `gather-inbox add "descrição"` |
 | Fez pendência inbox | `gather-inbox set --level <novo_total>` |
 
@@ -97,8 +97,8 @@ gather-bot add "msg" --status working|on|alert|question|working|off
 gather-bot list
 gather-bot clear
 
-gather-light on --color green|red|yellow
-gather-light off --color green|red|yellow
+gather-light on --color green|red|orange
+gather-light off --color green|red|orange
 
 gather-inbox add "tarefa"
 gather-inbox set --level N

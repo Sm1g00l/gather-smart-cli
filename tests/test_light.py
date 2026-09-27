@@ -30,7 +30,7 @@ def test_light_on_yellow():
         m.return_value.status_code = 200
         result = runner.invoke(cli, ["on", "--color", "yellow"])
     assert result.exit_code == 0
-    assert "yellow -> ON" in result.output
+    assert "orange -> ON" in result.output
 
 def test_light_off_green():
     runner = CliRunner()
@@ -72,7 +72,7 @@ def test_light_off_webhook_404():
 
 def test_light_all_colors():
     runner = CliRunner()
-    for color in ["green", "red", "yellow"]:
+    for color in ["green", "red", "orange"]:
         runner = CliRunner()
         with mock.patch("gather_cli.webhook.requests.post") as m:
             m.return_value.status_code = 200

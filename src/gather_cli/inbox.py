@@ -62,6 +62,47 @@ def add(message):
     tasks.append({"msg": message, "id": payload["data"]["id"], "level": max([t.get("level", 0) for t in tasks] or [0]) + 1})
     TASKS_FILE.write_text(json.dumps(tasks, indent=2))
 
+@cli.command()
+@click.argument("task_id")
+def remove(task_id):
+    url = os.getenv("INBOX_URL", "")
+    secret = get_secret_bytes("INBOX_KEY")
+    if not url or not secret:
+        click.echo("Erro: INBOX_URL ou INBOX_KEY não configurados")
+        return
+    payload = {"type": "activity.remove", "data": {"id": task_id}}
+    try:
+        resp = sign_and_post(url, secret, payload)
+        if resp.status_code == 404:
+            click.echo(f"Webhook 404 (endpoint inacessível). Removido: {task_id}")
+        else:
+            click.echo(f"Tarefa removida: {task_id} (status: {resp.status_code})")
+    except Exception as e:
+        click.echo(f"Erro webhook: {e}")
+    if TASKS_FILE.exists():
+        tasks = json.loads(TASKS_FILE.read_text())
+        tasks = [t for t in tasks if t.get("id") != task_id]
+        TASKS_FILE.write_text(json.dumps(tasks, indent=2))
+
+@cli.command()
+def clear():
+    url = os.getenv("INBOX_URL", "")
+    secret = get_secret_bytes("INBOX_KEY")
+    if not url or not secret:
+        click.echo("Erro: INBOX_URL ou INBOX_KEY não configurados")
+        return
+    payload = {"type": "activity.clear", "data": {}}
+    try:
+        resp = sign_and_post(url, secret, payload)
+        if resp.status_code == 404:
+            click.echo(f"Webhook 404 (endpoint inacessível). Inbox limpo")
+        else:
+            click.echo(f"Inbox limpo (status: {resp.status_code})")
+    except Exception as e:
+        click.echo(f"Erro webhook: {e}")
+    if TASKS_FILE.exists():
+        TASKS_FILE.write_text(json.dumps([], indent=2))
+
 @cli.command(name="list")
 def list_tasks():
     if not TASKS_FILE.exists():

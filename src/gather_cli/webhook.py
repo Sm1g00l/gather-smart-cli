@@ -45,3 +45,23 @@ def sign_and_post(url: str, secret_bytes: bytes, payload: dict) -> requests.Resp
         "webhook-signature": signature,
     }
     return requests.post(url, data=raw_body, headers=headers, timeout=15)
+
+def rate_limit_info(resp: requests.Response) -> dict:
+    """Headers de rate limit do Gather (60 req/min por space).
+
+    Em toda resposta: ratelimit-limit, ratelimit-remaining, ratelimit-policy ("60;w=60").
+    No 429: retry-after (segundos). RateLimit-Reset é exposto via CORS mas não vem.
+    """
+    def as_int(name):
+        val = resp.headers.get(name, "")
+        return int(val) if val.strip().isdigit() else None
+
+    info = {
+        "limit": as_int("RateLimit-Limit"),
+        "remaining": as_int("RateLimit-Remaining"),
+        "policy": resp.headers.get("RateLimit-Policy"),
+        "retry_after": as_int("Retry-After"),
+    }
+    if info["retry_after"] is None:
+        info["retry_after"] = as_int("RateLimit-Reset")
+    return info

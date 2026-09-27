@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from gather_cli import bot, inbox, light
-from gather_cli.webhook import get_secret_bytes, sign_and_post
+from gather_cli.webhook import get_secret_bytes, rate_limit_info, sign_and_post
 
 pytestmark = [
     pytest.mark.e2e,
@@ -40,8 +40,8 @@ def post(obj, payload):
         resp = sign_and_post(os.getenv(url_env, ""), get_secret_bytes(key_env), payload)
         if resp.status_code != 429 or time.time() > deadline:
             return resp
-        reset = resp.headers.get("RateLimit-Reset", "")
-        time.sleep(int(reset) if reset.isdigit() else 10)
+        retry = rate_limit_info(resp)["retry_after"]
+        time.sleep(retry if retry is not None else 10)
 
 
 def send(obj, payload):
@@ -80,6 +80,12 @@ def snapshot_and_restore():
     for url_env, key_env in OBJECTS.values():
         if not os.getenv(url_env) or not os.getenv(key_env):
             pytest.skip(f"{url_env}/{key_env} ausentes no .env")
+    # Cota do space: se não sobra o suficiente para a suíte (~52 req), espera a janela virar
+    probe = post("bot", {"type": "webhook.ping"})
+    rl = rate_limit_info(probe)
+    if rl["remaining"] is not None and rl["remaining"] < 55:
+        window = int((rl["policy"] or "60;w=60").split("w=")[-1])
+        time.sleep(window)
     before = {obj: state(obj) for obj in OBJECTS}
     yield before
     b, l, i = before["bot"], before["light"], before["inbox"]

@@ -95,7 +95,7 @@ pytest                           # unitários (mockados), não tocam no Gather
 GATHER_E2E=1 pytest -m e2e -v    # ponta a ponta contra os Smart Objects reais do .env
 ```
 O e2e tira um snapshot dos 3 objetos, exercita todos os comandos e restaura o estado original no fim (e confere).
-Faz ~45 requisições: rodar duas vezes seguidas bate no limite de 60/min (o teste espera o `429` liberar).
+Faz ~52 requisições. Lê a cota nos headers (`RateLimit-Remaining`): se não sobra o bastante, espera a janela de 60s antes de começar, e num `429` espera o `Retry-After`.
 
 ---
 
@@ -112,7 +112,7 @@ Use **texto simples + emojis**: ✅ 🔴 ⚠️ ❓ 🟢
 | `400` / `415` | Body/Content-Type inválido | Não edite payload manualmente |
 | `404 not_found` | Secret errado, URL errada, timestamp >5min | Rode `gather-bot ping`, confira `.env` |
 | `410 token_revoked` | Token regenerado no painel | Copie novo `whsec_...` pro `.env` |
-| `429 rate_limited` | 60 req/min/space ou 100/min/IP | Espere `RateLimit-Reset` segs |
+| `429 rate_limited` | 60 req/min/space ou 100/min/IP | Espere `Retry-After` segs (cota em `RateLimit-Remaining`) |
 | `503` | Transitório | Retry com backoff |
 
 ---

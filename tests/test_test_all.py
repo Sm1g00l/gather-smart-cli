@@ -122,3 +122,27 @@ def test_test_all_network_error():
             result = runner.invoke(cli, ["all"])
         assert result.exit_code == 0
         assert "EXCEÇÃO" in result.output or "Erro" in result.output
+
+def test_test_all_429_uses_gather_retry_after_header():
+    # Headers reais de um 429 do Gather (sem RateLimit-Reset)
+    from requests.structures import CaseInsensitiveDict
+    headers = CaseInsensitiveDict({"ratelimit-policy": "60;w=60", "ratelimit-limit": "60",
+                                   "ratelimit-remaining": "0", "retry-after": "60"})
+    runner = CliRunner()
+    with runner.isolated_filesystem() as tmp:
+        _make_env(Path(tmp))
+        with mock.patch("gather_cli.webhook.requests.post") as m:
+            m.return_value = _mock_response(429, {"error": "rate_limited"}, headers=headers)
+            result = runner.invoke(cli, ["all"])
+        assert "Retry-After=60s" in result.output
+        assert "Rate limit: 0/60 restantes" in result.output
+
+
+def test_rate_limit_info():
+    from requests.structures import CaseInsensitiveDict
+    from gather_cli.webhook import rate_limit_info
+    resp = mock.MagicMock()
+    resp.headers = CaseInsensitiveDict({"ratelimit-policy": "60;w=60", "ratelimit-limit": "60", "ratelimit-remaining": "57"})
+    assert rate_limit_info(resp) == {"limit": 60, "remaining": 57, "policy": "60;w=60", "retry_after": None}
+    resp.headers = CaseInsensitiveDict({"ratelimit-remaining": "0", "retry-after": "60"})
+    assert rate_limit_info(resp)["retry_after"] == 60

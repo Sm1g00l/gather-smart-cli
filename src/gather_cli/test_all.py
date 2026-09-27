@@ -1,7 +1,7 @@
 import click
 import os
 from dotenv import load_dotenv
-from gather_cli.webhook import get_secret_bytes, sign_and_post
+from gather_cli.webhook import get_secret_bytes, rate_limit_info, sign_and_post
 
 load_dotenv()
 
@@ -19,6 +19,7 @@ def cli():
 @click.option("--full", is_flag=True, help="Mostrar body completo da resposta")
 def all(full):
     results = []
+    last_rl = None
     for name, url_key, key_key in OBJECTS:
         url = os.getenv(url_key, "")
         secret_raw = os.getenv(key_key, "")
@@ -34,6 +35,7 @@ def all(full):
         payload = {"type": "webhook.ping"}
         try:
             resp = sign_and_post(url, secret, payload)
+            last_rl = rate_limit_info(resp)
             if resp.status_code == 200:
                 pong_info = "pong recebido"
                 try:
@@ -58,8 +60,8 @@ def all(full):
                 results.append((name, "400", msg))
             elif resp.status_code == 429:
                 msg = resp.text[:200]
-                reset = resp.headers.get("RateLimit-Reset", "?")
-                click.echo(f"[429] {name}: rate_limited (Reset={reset}) | {msg}")
+                retry = rate_limit_info(resp)["retry_after"]
+                click.echo(f"[429] {name}: rate_limited (Retry-After={retry if retry is not None else '?'}s) | {msg}")
                 results.append((name, "429", msg))
             else:
                 msg = resp.text[:200]
@@ -68,6 +70,8 @@ def all(full):
         except Exception as e:
             click.echo(f"[EXCEÇÃO] {name}: {str(e)[:200]}")
             results.append((name, "EXCEÇÃO", str(e)[:200]))
+    if last_rl and last_rl["remaining"] is not None:
+        click.echo(f"\nRate limit: {last_rl['remaining']}/{last_rl['limit']} restantes (policy {last_rl['policy']})")
     click.echo("\n=== RESUMO ===")
     for name, status, detail in results:
         click.echo(f"{name}: {status} ({detail})")

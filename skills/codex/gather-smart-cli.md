@@ -66,7 +66,7 @@ gather-inbox config default meu
 | `404 not_found` | `gather-bot ping` → confira `.env`; veja capabilities no `pong` |
 | `404 capability_not_declared` | Rode `ping` → veja capabilities reais |
 | `410 token_revoked` | Novo `whsec_...` no painel → `.env` |
-| `429 rate_limited` | Aguarde `RateLimit-Reset` segs; não faça burst |
+| `429 rate_limited` | Aguarde `Retry-After` segs (veja `RateLimit-Remaining`); não faça burst |
 | `503` | Retry com backoff + `Retry-After` |
 
 ---

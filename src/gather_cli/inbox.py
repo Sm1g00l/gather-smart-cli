@@ -1,26 +1,114 @@
 import click
 import json
 import os
+import base64
 from pathlib import Path
 from dotenv import load_dotenv
 from gather_cli.webhook import get_secret_bytes, sign_and_post
+from gather_cli.inbox_config import get_config
 
 load_dotenv()
 
 TASKS_FILE = Path("tasks.json")
 
+_config_override = None
+
+def set_config_override(path: Path):
+    global _config_override
+    _config_override = path
+
+def clear_config_override():
+    global _config_override
+    _config_override = None
+
+def _get_config():
+    if _config_override:
+        return get_config(_config_override)
+    return get_config()
+
+def _decode_secret(key: str) -> bytes:
+    """Decode whsec_ secret from base64."""
+    if key.startswith("whsec_"):
+        stripped = key[len("whsec_"):]
+        try:
+            return base64.b64decode(stripped)
+        except Exception:
+            return stripped.encode()
+    return key.encode()
+
+def _resolve_inbox(target: str = None):
+    config = _get_config()
+    
+    if target:
+        inbox = config.get(target)
+        if not inbox:
+            raise click.ClickException(f"Inbox '{target}' não encontrado. Use 'gather-inbox config list' para ver disponíveis.")
+        return inbox["url"], _decode_secret(inbox["key"])
+    
+    default_name = config.get_default()
+    if default_name:
+        inbox = config.get(default_name)
+        if inbox:
+            return inbox["url"], _decode_secret(inbox["key"])
+    
+    url = os.getenv("INBOX_URL", "")
+    key = get_secret_bytes("INBOX_KEY")
+    if not url or not key:
+        raise click.ClickException("Nenhum inbox configurado. Use 'gather-inbox config add' ou configure INBOX_URL/INBOX_KEY no .env")
+    return url, key
+
 @click.group()
 def cli():
     pass
 
+@cli.group(name="config")
+def config_group():
+    """Gerenciar inboxes salvos (multi-inbox)."""
+    pass
+
+@config_group.command("add")
+@click.argument("name")
+@click.option("--url", required=True, help="Webhook URL do inbox")
+@click.option("--key", required=True, help="Signing secret (whsec_...)")
+@click.option("--owner", default="", help="Nome do dono do inbox")
+def config_add(name, url, key, owner):
+    config = _get_config()
+    config.add(name, url, key, owner)
+    click.echo(f"Inbox '{name}' adicionado.")
+
+@config_group.command("list")
+def config_list():
+    config = _get_config()
+    inboxes = config.list()
+    if not inboxes:
+        click.echo("Nenhum inbox configurado.")
+        return
+    default = config.get_default()
+    for name, inbox in inboxes.items():
+        marker = " (default)" if name == default else ""
+        click.echo(f"  {name}{marker}: {inbox['owner']} - {inbox['url']} - key: {inbox['key']}")
+
+@config_group.command("remove")
+@click.argument("name")
+def config_remove(name):
+    config = _get_config()
+    config.remove(name)
+    click.echo(f"Inbox '{name}' removido.")
+
+@config_group.command("default")
+@click.argument("name")
+def config_default(name):
+    config = _get_config()
+    try:
+        config.set_default(name)
+        click.echo(f"Inbox '{name}' definido como default.")
+    except ValueError as e:
+        raise click.ClickException(str(e))
+
 @cli.command()
 @click.option("--level", default=0, type=int)
 def set(level):
-    url = os.getenv("INBOX_URL", "")
-    secret = get_secret_bytes("INBOX_KEY")
-    if not url or not secret:
-        click.echo("Erro: INBOX_URL ou INBOX_KEY não configurados")
-        return
+    url, secret = _resolve_inbox()
     payload = {"type": "counter.set", "data": {"count": level}}
     try:
         resp = sign_and_post(url, secret, payload)
@@ -41,12 +129,9 @@ def set(level):
 
 @cli.command()
 @click.argument("message")
-def add(message):
-    url = os.getenv("INBOX_URL", "")
-    secret = get_secret_bytes("INBOX_KEY")
-    if not url or not secret:
-        click.echo("Erro: INBOX_URL ou INBOX_KEY não configurados")
-        return
+@click.option("--to", "target", default=None, help="Enviar para inbox específico (nome salvo no config)")
+def add(message, target):
+    url, secret = _resolve_inbox(target)
     payload = {"type": "activity.add", "data": {"id": f"task_{len(message)}", "text": message[:500]}}
     try:
         resp = sign_and_post(url, secret, payload)
@@ -65,11 +150,7 @@ def add(message):
 @cli.command()
 @click.argument("task_id")
 def remove(task_id):
-    url = os.getenv("INBOX_URL", "")
-    secret = get_secret_bytes("INBOX_KEY")
-    if not url or not secret:
-        click.echo("Erro: INBOX_URL ou INBOX_KEY não configurados")
-        return
+    url, secret = _resolve_inbox()
     payload = {"type": "activity.remove", "data": {"id": task_id}}
     try:
         resp = sign_and_post(url, secret, payload)
@@ -86,11 +167,7 @@ def remove(task_id):
 
 @cli.command()
 def clear():
-    url = os.getenv("INBOX_URL", "")
-    secret = get_secret_bytes("INBOX_KEY")
-    if not url or not secret:
-        click.echo("Erro: INBOX_URL ou INBOX_KEY não configurados")
-        return
+    url, secret = _resolve_inbox()
     payload = {"type": "activity.clear", "data": {}}
     try:
         resp = sign_and_post(url, secret, payload)

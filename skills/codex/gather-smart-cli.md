@@ -1,6 +1,6 @@
 ---
 name: gather-smart-cli
-version: 0.1.0
+version: 0.2.0
 description: CLI para atualizar Smart Objects do Gather Town via webhooks assinados.
 ---
 
@@ -37,10 +37,24 @@ gather-bot ping  # ou gather-test all
 | Usuário em call/reunião | `gather-light on --color red` |
 | Usuário livre/foco | `gather-light on --color green` |
 | Usuário ausente/almoço | `gather-light on --color yellow` |
-| Nova pendência | `gather-inbox add "descrição"` |
+| Nova pendência (seu inbox) | `gather-inbox add "descrição"` |
+| Nova pendência (inbox do colega) | `gather-inbox add "descrição" --to colega` |
 | Fez pendência do inbox | `gather-inbox set --level <novo_total>` |
 
-**Harness:** `plan`/`ask` = peça aprovação **antes** da ação; `auto`/`default` = execute ação + update (após ping OK).
+### Multi-inbox (v0.2.0)
+```bash
+# Configurar inbox de colega (1x)
+gather-inbox config add joao --url <url> --key whsec_... --owner "João"
+
+# Listar inboxes salvos
+gather-inbox config list
+
+# Enviar para inbox do colega
+gather-inbox add "tarefa para João" --to joao
+
+# Definir default
+gather-inbox config default meu
+```
 
 ---
 
@@ -63,13 +77,6 @@ gather-bot ping  # ou gather-test all
 
 ---
 
-## PRÉ-REQUISITOS
-- Python 3.11+ no PATH (`python3` / `py`)
-- `git` no PATH
-- Windows: instale Python marcando "Add to PATH"
-
----
-
 ## COMANDOS RÁPIDOS
 ```
 gather-bot ping
@@ -79,9 +86,15 @@ gather-bot list
 gather-light on --color green|red|yellow
 gather-light off --color green|red|yellow
 
-gather-inbox add "tarefa"
+gather-inbox add "tarefa" [--to nome]
+gather-inbox config add <nome> --url <url> --key whsec_... [--owner <nome>]
+gather-inbox config list
+gather-inbox config remove <nome>
+gather-inbox config default <nome>
 gather-inbox set --level N
 gather-inbox list
+gather-inbox remove <task_id>
+gather-inbox clear
 
 gather-test all
 gather-setup

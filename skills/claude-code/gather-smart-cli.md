@@ -1,6 +1,6 @@
 ---
 name: gather-smart-cli
-version: 0.2.0
+version: 0.2.5
 description: CLI para atualizar Smart Objects do Gather Town via webhooks assinados.
 ---
 

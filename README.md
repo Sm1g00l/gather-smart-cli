@@ -2,6 +2,8 @@
 
 CLI para atualizar Smart Objects do Gather Town via webhooks assinados (Standard Webhooks v1).
 
+**Versão atual: 0.2.5** — veja o [changelog](#-changelog).
+
 ---
 
 ## 🚀 Instalação (2 min)
@@ -19,14 +21,17 @@ CLI para atualizar Smart Objects do Gather Town via webhooks assinados (Standard
 ```bash
 git clone https://github.com/sm1g00l/gather-smart-cli
 cd gather-smart-cli
+git checkout v0.2.5   # opcional: fixa a versão
 pip install -e .
 ```
 
 ### 2. Instale a skill no seu agente de IA
-**Claude Code:**
+**Claude Code** (a skill precisa ficar numa pasta própria, como `SKILL.md`):
 ```bash
-cp skills/claude-code/gather-smart-cli.md ~/.claude/skills/
+mkdir -p ~/.claude/skills/gather-smart-cli
+cp skills/claude-code/gather-smart-cli.md ~/.claude/skills/gather-smart-cli/SKILL.md
 ```
+> Usa `CLAUDE_CONFIG_DIR` (várias contas)? Troque `~/.claude` pela pasta da conta.
 
 **Codex:**
 ```bash
@@ -55,7 +60,10 @@ Deve sair:
 [OK] Bot Monitor: 200 | preset=status, capabilities=...
 [OK] Lightbulb: 200 | preset=switch, capabilities=...
 [OK] Inbox: 200 | preset=inbox, capabilities=...
+
+Rate limit: 57/60 restantes (policy 60;w=60)
 ```
+O ping devolve o **estado vivo** de cada objeto (`status.state`, `activity.entries`, `switch.on`, `variant.color`, `counter.count`), então `gather-test all` também serve para conferir o efeito de um comando.
 
 ---
 
@@ -63,14 +71,18 @@ Deve sair:
 
 ### Bot Monitor — tarefas do agente
 ```bash
-gather-bot add "task: refatorar auth" --status working   # iniciou
-gather-bot add "task: refatorar auth" --status on      # concluiu
-gather-bot add "task: refatorar auth" --status alert   # bloqueado
+gather-bot add "task: refatorar auth" --status working  # iniciou
+gather-bot add "task: refatorar auth" --status on       # concluiu
+gather-bot add "task: refatorar auth" --status alert    # bloqueado
 gather-bot add "task: refatorar auth" --status question # dúvida
-gather-bot ping                                        # testa conexão
-gather-bot list                                        # histórico local
-gather-bot clear                                       # limpa as mensagens do bot
+gather-bot add --status off                             # só o estado, sem mensagem
+gather-bot ping                                         # testa conexão
+gather-bot list                                         # histórico local
+gather-bot clear                                        # limpa as mensagens do bot
 ```
+- O **estado** vira o ícone; o **texto** vira uma entrada de atividade no objeto.
+- Estados aceitos pelo Gather: `working`, `on`, `question`, `alert`, `off`. `timer` é aceito como alias de `working` (o Gather rejeita `timer` com `400`).
+- `list` mostra o histórico local (`bot_messages.json`, gravado no diretório atual).
 
 ### Lightbulb — presença do usuário
 ```bash
@@ -79,13 +91,46 @@ gather-light on --color red     # em reunião / não perturbe
 gather-light on --color orange  # ausente / almoço
 gather-light off --color green  # desliga
 ```
+Cores que a lâmpada aceita: `green`, `red`, `orange`. `yellow` vira `orange`: o Gather responde `200` para `yellow`, mas não muda a cor.
 
 ### Inbox — fila de pendentes
 ```bash
-gather-inbox add "revisar PR #42"
-gather-inbox set --level 3
-gather-inbox list
+gather-inbox add "revisar PR #42"          # cada tarefa ganha um id único
+gather-inbox set --level 3                 # contador do objeto
+gather-inbox remove <task_id>              # id aparece no gather-test all / list
+gather-inbox clear                         # remove todas as tarefas
+gather-inbox list                          # histórico local (tasks.json)
 ```
+
+**Multi-inbox** (inbox de colegas):
+```bash
+gather-inbox config add joao --url <url> --key whsec_... --owner "João"
+gather-inbox config list
+gather-inbox config default joao
+gather-inbox config remove joao
+gather-inbox add "tarefa para o João" --to joao
+```
+Os inboxes salvos ficam em `~/.config/gather-cli/inboxes.json` (chmod 600). Sem nenhum salvo, vale `INBOX_URL`/`INBOX_KEY` do `.env`.
+
+---
+
+## ⏱️ Rate limit
+O Gather limita a **60 requisições por minuto por space** (e 100/min por IP). Toda resposta traz a cota:
+
+| Header | Exemplo | Quando vem |
+|---|---|---|
+| `RateLimit-Limit` | `60` | sempre |
+| `RateLimit-Remaining` | `57` | sempre |
+| `RateLimit-Policy` | `60;w=60` (60 req em janela de 60s) | sempre |
+| `Retry-After` | `60` (segundos) | no `429` |
+
+Num `429`, a CLI **segura a execução** por `Retry-After` + 2s e reenvia a mesma mensagem (mesmo `webhook-id`, assinatura nova). Avisa no stderr enquanto espera:
+```
+Gather 429: aguardando 62s (Retry-After=60s)...
+```
+O teto de espera por comando é `GATHER_MAX_WAIT` (padrão `150` segundos); passando disso, o `429` é devolvido. Um `503` com `Retry-After` segue a mesma regra.
+
+`gather-bot add` com texto faz 2 requisições (atividade + estado); `gather-light` também faz 2 (cor + liga/desliga).
 
 ---
 
@@ -95,7 +140,7 @@ pytest                           # unitários (mockados), não tocam no Gather
 GATHER_E2E=1 pytest -m e2e -v    # ponta a ponta contra os Smart Objects reais do .env
 ```
 O e2e tira um snapshot dos 3 objetos, exercita todos os comandos e restaura o estado original no fim (e confere).
-Faz ~52 requisições. Lê a cota nos headers (`RateLimit-Remaining`): se não sobra o bastante, espera a janela de 60s antes de começar, e num `429` espera o `Retry-After`.
+Faz ~52 requisições. Lê a cota nos headers (`RateLimit-Remaining`): se não sobra o bastante, espera a janela de 60s antes de começar; num `429`, a própria CLI espera o `Retry-After`. Enquanto roda, ele consome quase toda a cota do space por ~1 minuto.
 
 ---
 
@@ -114,6 +159,23 @@ Use **texto simples + emojis**: ✅ 🔴 ⚠️ ❓ 🟢
 | `410 token_revoked` | Token regenerado no painel | Copie novo `whsec_...` pro `.env` |
 | `429 rate_limited` | 60 req/min/space ou 100/min/IP | A CLI espera sozinha `Retry-After` + 2s e reenvia (teto: `GATHER_MAX_WAIT`, padrão 150s) |
 | `503` | Transitório | Com `Retry-After`, a CLI espera e reenvia; sem ele, tente de novo depois |
+
+---
+
+## 📝 Changelog
+
+### 0.2.5
+Tudo validado contra os Smart Objects reais (ver `tests/test_e2e.py`).
+- **Bot Monitor:** o texto do `add` agora chega ao Gather (como atividade); antes só ia pro arquivo local.
+- **Bot Monitor:** `timer` (antigo padrão) era rejeitado com `400`; padrão agora é `working`, `timer` virou alias.
+- **Bot Monitor:** novo `gather-bot clear`.
+- **Lightbulb:** `--color` era ignorado; agora envia `variant.set`. Nova cor `orange`; `yellow` (que o Gather ignora) virou alias de `orange`.
+- **Inbox:** id da tarefa era `task_<tamanho do texto>` e colidia; agora é único.
+- **Rate limit:** a CLI respeita `Retry-After` no `429` e reenvia (teto `GATHER_MAX_WAIT`); `gather-test all` mostra a cota restante.
+- **Testes:** suíte e2e opcional (`GATHER_E2E=1 pytest -m e2e`) com snapshot e restauração do estado.
+
+### 0.2.0
+- Multi-inbox (`gather-inbox config ...`, `--to`), `gather-inbox remove` e `clear`.
 
 ---
 

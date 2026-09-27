@@ -32,7 +32,7 @@ def ping():
 
 @cli.command()
 @click.argument("message", required=False)
-@click.option("--status", default="timer", type=click.Choice(["off", "on", "question", "alert", "working"]))
+@click.option("--status", default="timer", type=click.Choice(["timer", "on", "question", "alert", "working", "off"]))
 def add(message, status):
     secret = get_secret_bytes("BOT_MONITOR_KEY")
     url = os.getenv("BOT_MONITOR_URL", "")

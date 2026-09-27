@@ -111,3 +111,169 @@ def test_inbox_add_without_to_uses_default():
         args = m.call_args
         assert args is not None, "Mock not called"
         assert "my.url" in str(args)
+
+# Config commands tests
+def test_inbox_config_add():
+    runner = CliRunner()
+    with runner.isolated_filesystem() as tmp:
+        tmp_path = Path(tmp)
+        config_file = _make_config(tmp_path, {"default": "meu", "inboxes": {}})
+        import gather_cli.inbox as inbox_module
+        inbox_module.set_config_override(config_file)
+        
+        result = runner.invoke(cli, ["config", "add", "novo", "--url", "https://new.url", "--key", "whsec_newkey", "--owner", "Novo"])
+        
+        inbox_module.clear_config_override()
+        
+        assert result.exit_code == 0
+        assert "adicionado" in result.output.lower()
+
+def test_inbox_config_list():
+    runner = CliRunner()
+    with runner.isolated_filesystem() as tmp:
+        tmp_path = Path(tmp)
+        config_file = _make_config(tmp_path, {
+            "default": "meu",
+            "inboxes": {
+                "meu": {"url": "https://my.url", "key": "whsec_mykey", "owner": "Me"}
+            }
+        })
+        import gather_cli.inbox as inbox_module
+        inbox_module.set_config_override(config_file)
+        
+        result = runner.invoke(cli, ["config", "list"])
+        
+        inbox_module.clear_config_override()
+        
+        assert result.exit_code == 0
+        assert "meu" in result.output
+        assert "whsec_***" in result.output
+
+def test_inbox_config_remove():
+    runner = CliRunner()
+    with runner.isolated_filesystem() as tmp:
+        tmp_path = Path(tmp)
+        config_file = _make_config(tmp_path, {
+            "default": "meu",
+            "inboxes": {
+                "meu": {"url": "https://my.url", "key": "whsec_mykey", "owner": "Me"},
+                "outro": {"url": "https://outro.url", "key": "whsec_outrokey", "owner": "Outro"}
+            }
+        })
+        import gather_cli.inbox as inbox_module
+        inbox_module.set_config_override(config_file)
+        
+        result = runner.invoke(cli, ["config", "remove", "outro"])
+        
+        inbox_module.clear_config_override()
+        
+        assert result.exit_code == 0
+        assert "removido" in result.output.lower()
+
+def test_inbox_config_default():
+    runner = CliRunner()
+    with runner.isolated_filesystem() as tmp:
+        tmp_path = Path(tmp)
+        config_file = _make_config(tmp_path, {
+            "default": "meu",
+            "inboxes": {
+                "meu": {"url": "https://my.url", "key": "whsec_mykey", "owner": "Me"},
+                "joao": {"url": "https://joao.url", "key": "whsec_joaokey", "owner": "João"}
+            }
+        })
+        import gather_cli.inbox as inbox_module
+        inbox_module.set_config_override(config_file)
+        
+        result = runner.invoke(cli, ["config", "default", "joao"])
+        
+        inbox_module.clear_config_override()
+        
+        assert result.exit_code == 0
+        assert "default" in result.output.lower()
+
+def test_inbox_config_default_invalid():
+    runner = CliRunner()
+    with runner.isolated_filesystem() as tmp:
+        tmp_path = Path(tmp)
+        config_file = _make_config(tmp_path, {
+            "default": "meu",
+            "inboxes": {"meu": {"url": "https://my.url", "key": "whsec_mykey", "owner": "Me"}}
+        })
+        import gather_cli.inbox as inbox_module
+        inbox_module.set_config_override(config_file)
+        
+        result = runner.invoke(cli, ["config", "default", "inexistente"])
+        
+        inbox_module.clear_config_override()
+        
+        assert result.exit_code != 0
+        assert "não encontrado" in result.output.lower() or "not found" in result.output.lower()
+
+# Error handling tests
+def test_inbox_add_webhook_404():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with mock.patch("gather_cli.webhook.requests.post") as m:
+            mock_resp = mock.MagicMock()
+            mock_resp.status_code = 404
+            m.return_value = mock_resp
+            result = runner.invoke(cli, ["add", "tarefa X"])
+        assert result.exit_code == 0
+        assert "404" in result.output
+
+def test_inbox_add_webhook_error():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with mock.patch("gather_cli.webhook.requests.post") as m:
+            m.side_effect = Exception("Connection error")
+            result = runner.invoke(cli, ["add", "tarefa X"])
+        assert result.exit_code == 0
+        assert "Erro webhook" in result.output
+
+def test_inbox_remove_webhook_404():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("tasks.json").write_text(json.dumps([{"id": "task_1", "msg": "test", "level": 1}]))
+        with mock.patch("gather_cli.webhook.requests.post") as m:
+            mock_resp = mock.MagicMock()
+            mock_resp.status_code = 404
+            m.return_value = mock_resp
+            result = runner.invoke(cli, ["remove", "task_1"])
+        assert result.exit_code == 0
+        assert "404" in result.output
+
+def test_inbox_clear_webhook_404():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("tasks.json").write_text(json.dumps([{"id": "task_1", "msg": "test", "level": 1}]))
+        with mock.patch("gather_cli.webhook.requests.post") as m:
+            mock_resp = mock.MagicMock()
+            mock_resp.status_code = 404
+            m.return_value = mock_resp
+            result = runner.invoke(cli, ["clear"])
+        assert result.exit_code == 0
+        assert "404" in result.output
+
+def test_inbox_list_empty():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        result = runner.invoke(cli, ["list"])
+        assert result.exit_code == 0
+        assert "Nenhuma tarefa" in result.output
+
+def test_inbox_list_with_tasks():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("tasks.json").write_text(json.dumps([{"id": "task_1", "msg": "test", "level": 1}]))
+        result = runner.invoke(cli, ["list"])
+        assert result.exit_code == 0
+        assert "task_1" in result.output
+
+def test_inbox_set_level():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with mock.patch("gather_cli.webhook.requests.post") as m:
+            m.return_value.status_code = 200
+            result = runner.invoke(cli, ["set", "--level", "5"])
+        assert result.exit_code == 0
+        assert "nível definido: 5" in result.output.lower()

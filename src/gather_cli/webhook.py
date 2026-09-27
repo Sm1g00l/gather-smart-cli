@@ -5,6 +5,7 @@ import time
 import json
 import uuid
 import os
+import sys
 import requests
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,16 +25,25 @@ def get_secret_bytes(env_key: str) -> bytes:
             return stripped.encode()
     return val.encode()
 
-def sign_and_post(url: str, secret_bytes: bytes, payload: dict) -> requests.Response:
-    webhook_id = str(uuid.uuid4())
+# Margem somada ao Retry-After antes de tentar de novo, e teto total de espera por chamada
+RETRY_MARGIN_SECONDS = 2
+DEFAULT_RETRY_AFTER_SECONDS = 10
+
+
+def max_wait_seconds() -> int:
+    val = os.getenv("GATHER_MAX_WAIT", "")
+    return int(val) if val.isdigit() else 150
+
+
+def _post_once(url: str, secret_bytes: bytes, payload: dict, webhook_id: str) -> requests.Response:
     unix_ts = int(time.time())
-    
+
     # Clone payload e adiciona timestamp ISO-8601 para eventos não-ping
     body_payload = payload.copy()
     if payload.get("type") != "webhook.ping":
         iso_ts = datetime.fromtimestamp(unix_ts, tz=timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
         body_payload["timestamp"] = iso_ts
-    
+
     raw_body = json.dumps(body_payload, separators=(",", ":"))
     signed_content = f"{webhook_id}.{unix_ts}.{raw_body}"
     sig_bytes = hmac.new(secret_bytes, signed_content.encode(), hashlib.sha256).digest()
@@ -45,6 +55,28 @@ def sign_and_post(url: str, secret_bytes: bytes, payload: dict) -> requests.Resp
         "webhook-signature": signature,
     }
     return requests.post(url, data=raw_body, headers=headers, timeout=15)
+
+
+def sign_and_post(url: str, secret_bytes: bytes, payload: dict) -> requests.Response:
+    """Assina e envia. Em 429 (ou 503 com Retry-After) segura a execução até
+    Retry-After + margem e reenvia a mesma mensagem (mesmo webhook-id, assinatura
+    nova), até o teto de GATHER_MAX_WAIT segundos (padrão 150)."""
+    webhook_id = str(uuid.uuid4())
+    waited = 0
+    while True:
+        resp = _post_once(url, secret_bytes, payload, webhook_id)
+        retry_after = rate_limit_info(resp)["retry_after"]
+        if resp.status_code == 429:
+            retry_after = retry_after if retry_after is not None else DEFAULT_RETRY_AFTER_SECONDS
+        elif not (resp.status_code == 503 and retry_after is not None):
+            return resp
+        wait = retry_after + RETRY_MARGIN_SECONDS
+        if waited + wait > max_wait_seconds():
+            return resp
+        print(f"Gather {resp.status_code}: aguardando {wait}s (Retry-After={retry_after}s)...", file=sys.stderr, flush=True)
+        time.sleep(wait)
+        waited += wait
+
 
 def rate_limit_info(resp: requests.Response) -> dict:
     """Headers de rate limit do Gather (60 req/min por space).

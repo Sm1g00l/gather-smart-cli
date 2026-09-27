@@ -80,7 +80,7 @@ gather-bot ping  # ou gather-test all
 | `404 not_found` | `gather-bot ping` → confira `.env`; veja capabilities no `pong` |
 | `404 capability_not_declared` | Rode `ping` → veja capabilities reais |
 | `410 token_revoked` | Novo `whsec_...` no painel → `.env` |
-| `429` | Aguarde `Retry-After` segs (veja `RateLimit-Remaining`); não burst |
+| `429` | A CLI já espera `Retry-After` + 2s e reenvia (teto `GATHER_MAX_WAIT`, padrão 150s); não faça burst |
 | `503` | Retry com backoff + `Retry-After` |
 
 ---

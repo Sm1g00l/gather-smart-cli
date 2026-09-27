@@ -146,3 +146,39 @@ def test_rate_limit_info():
     assert rate_limit_info(resp) == {"limit": 60, "remaining": 57, "policy": "60;w=60", "retry_after": None}
     resp.headers = CaseInsensitiveDict({"ratelimit-remaining": "0", "retry-after": "60"})
     assert rate_limit_info(resp)["retry_after"] == 60
+
+
+def _rl_response(status, headers):
+    from requests.structures import CaseInsensitiveDict
+    return _mock_response(status, {"type": "webhook.pong"}, headers=CaseInsensitiveDict(headers))
+
+
+def test_sign_and_post_waits_retry_after_and_retries(no_real_rate_limit_wait):
+    from gather_cli.webhook import RETRY_MARGIN_SECONDS, sign_and_post
+    with mock.patch("gather_cli.webhook.requests.post") as m:
+        m.side_effect = [_rl_response(429, {"retry-after": "7"}), _rl_response(200, {})]
+        resp = sign_and_post("http://test/bot", b"k", {"type": "status.set", "data": {"state": "on"}})
+    assert resp.status_code == 200
+    no_real_rate_limit_wait.assert_called_once_with(7 + RETRY_MARGIN_SECONDS)
+    ids = [c.kwargs["headers"]["webhook-id"] for c in m.call_args_list]
+    assert len(ids) == 2 and ids[0] == ids[1]  # mesma mensagem reenviada
+
+
+def test_sign_and_post_gives_up_after_max_wait(no_real_rate_limit_wait, monkeypatch):
+    from gather_cli.webhook import sign_and_post
+    monkeypatch.setenv("GATHER_MAX_WAIT", "100")
+    with mock.patch("gather_cli.webhook.requests.post") as m:
+        m.return_value = _rl_response(429, {"retry-after": "60"})
+        resp = sign_and_post("http://test/bot", b"k", {"type": "webhook.ping"})
+    assert resp.status_code == 429
+    assert no_real_rate_limit_wait.call_count == 1  # 62s cabe em 100; o segundo 62s não
+    assert m.call_count == 2
+
+
+def test_sign_and_post_does_not_retry_503_without_retry_after(no_real_rate_limit_wait):
+    from gather_cli.webhook import sign_and_post
+    with mock.patch("gather_cli.webhook.requests.post") as m:
+        m.return_value = _rl_response(503, {})
+        resp = sign_and_post("http://test/bot", b"k", {"type": "webhook.ping"})
+    assert resp.status_code == 503
+    no_real_rate_limit_wait.assert_not_called()

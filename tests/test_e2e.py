@@ -33,15 +33,9 @@ OBJECTS = {
 
 
 def post(obj, payload):
-    """Envia direto ao webhook; em 429 espera o limite (60 req/min por space) liberar."""
+    """Envia direto ao webhook (sign_and_post já segura a execução em 429 via Retry-After)."""
     url_env, key_env = OBJECTS[obj]
-    deadline = time.time() + 90
-    while True:
-        resp = sign_and_post(os.getenv(url_env, ""), get_secret_bytes(key_env), payload)
-        if resp.status_code != 429 or time.time() > deadline:
-            return resp
-        retry = rate_limit_info(resp)["retry_after"]
-        time.sleep(retry if retry is not None else 10)
+    return sign_and_post(os.getenv(url_env, ""), get_secret_bytes(key_env), payload)
 
 
 def send(obj, payload):

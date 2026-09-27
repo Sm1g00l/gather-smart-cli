@@ -6,7 +6,7 @@ from gather_cli.light import cli
 
 def test_light_on_red():
     runner = CliRunner()
-    with mock.patch("gather_cli.light.requests.post") as m:
+    with mock.patch("gather_cli.webhook.requests.post") as m:
         m.return_value.status_code = 200
         result = runner.invoke(cli, ["on", "--color", "red"])
         assert result.exit_code == 0
@@ -14,5 +14,4 @@ def test_light_on_red():
         args = m.call_args
         payload_raw = args.kwargs.get("data") or args.kwargs.get("json")
         payload_json = json.loads(payload_raw) if isinstance(payload_raw, str) else payload_raw
-        # SDK oficial: tipo do evento e data
         assert payload_json.get("type") == "switch.set_state" or payload_json.get("data", {}).get("on") is True

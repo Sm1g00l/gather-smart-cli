@@ -8,7 +8,7 @@ from gather_cli.bot import cli
 def test_bot_add_timer_sdk():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        with mock.patch("gather_cli.bot.requests.post") as mpost:
+        with mock.patch("gather_cli.webhook.requests.post") as mpost:
             mpost.return_value.raise_for_status = lambda: None
             mpost.return_value.status_code = 200
             result = runner.invoke(cli, ["add", "refatorar auth", "--status", "working"])
@@ -19,7 +19,6 @@ def test_bot_add_timer_sdk():
         assert len(data) == 1
         assert data[0]["msg"] == "refatorar auth"
         assert data[0]["status"] == "working"
-        # Verifica payload SDK oficial: status.set
         args = mpost.call_args
         payload_raw = args.kwargs.get("data") or args.kwargs.get("json")
         payload_json = json.loads(payload_raw) if isinstance(payload_raw, str) else payload_raw

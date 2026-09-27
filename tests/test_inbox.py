@@ -7,18 +7,15 @@ from gather_cli.inbox import cli
 def test_inbox_add():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        with mock.patch("gather_cli.inbox.requests.post") as m:
+        with mock.patch("gather_cli.webhook.requests.post") as m:
             m.return_value.status_code = 200
             result = runner.invoke(cli, ["add", "tarefa X"])
         assert result.exit_code == 0
         tasks = json.loads(Path("tasks.json").read_text())
         assert len(tasks) == 1
         assert tasks[0]["msg"] == "tarefa X"
-        assert tasks[0]["level"] == 1  # nível crescente
-        # SDK oficial: inbox.activity.add (id, text, url?) ou inbox.counter.set
+        assert tasks[0]["level"] == 1
         args = m.call_args
         payload_raw = args.kwargs.get("data") or args.kwargs.get("json")
         payload_json = json.loads(payload_raw) if isinstance(payload_raw, str) else payload_raw
-        # SDK oficial: tipo do evento e data
-        payload_json = json.loads(payload_raw) if isinstance(payload_raw, str) else payload_raw
-        assert payload_json.get("type") == "status.set" or payload_json.get("type") == "activity.add"
+        assert payload_json.get("type") == "activity.add"

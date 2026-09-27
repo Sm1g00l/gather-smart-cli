@@ -1,15 +1,112 @@
-Repo: https://github.com/sm1g00l/gather-smart-cli
+# gather-smart-cli — Prompt para Agentes (Claude Code, Codex, etc.)
 
-Passos para qualquer agente (Claude Code, Codex, etc.):
-1. Clone ou atualize: `git clone <repo>` ou `git pull`
-2. Instale a CLI: `cd gather-smart-cli && pip install -e .`
-3. Instale a skill no agente: `cp skills/claude-code/* ~/.claude/skills/` (ou equivalente no Codex)
-4. Sempre que uma tarefa de trabalho progredir: atualize os smart objects no Gather conforme o progresso real — `gather-bot add "task: <nome>" <status>` (timer/início, smiley/conclusão, warning/bloqueio), `gather-light --color green/red/yellow` (ocupação/reunião/bloqueio), `gather-inbox add/set` (fila de tarefas pendentes). Não atualize o repo (`git pull`) a cada ação. Se harness = `plan`/`ask`: peça aprovação; se `auto`/`default`: atualize diretamente.
-5. Use: `gather setup`, `gather-bot add "mensagem" smiley`, `gather-light --color green`, `gather-inbox add "tarefa X"
+## Objetivo
+CLI (`gather-bot`, `gather-light`, `gather-inbox`, `gather-test`, `gather-setup`) para atualizar Smart Objects do Gather Town.
 
-Nota sobre harness:
-- `auto` / `default`: atualize os objetos diretamente (sem perguntar).
-- `plan` / `ask`: peça aprovação antes de alterar estados.
+---
 
-Nota sobre formatação (pendência):
-- Markdown simples (`**bold**`, `*italic*`) ainda não verificado no webhook do Bot Monitor. Use texto simples + emojis até confirmar.
+## FONTE DA VERDADE: O ENDPOINT VIVO
+
+**Antes de QUALQUER update**, rode `gather-bot ping`. Se não retornar 200, **pare e corrija** — não envie comandos cegos.
+
+---
+
+## PRÉ-REQUISITOS POR SO
+
+| Sistema | Verifique |
+|---------|-----------|
+| Linux/macOS | `python3 --version` (>=3.11), `git` |
+| Windows | `py --version` (>=3.11), `git` |
+
+> Python: [python.org/downloads](https://python.org/downloads) → "Add to PATH" no Windows.
+
+---
+
+## INSTALAÇÃO DA CLI + SKILL
+
+```bash
+# 1. Clone e instale
+cd /path/to/gather-smart-cli
+pip install -e .
+
+# 2. Instale skill no agente
+# Claude Code:
+cp skills/claude-code/gather-smart-cli.md ~/.claude/skills/
+# Codex:
+cp skills/codex/gather-smart-cli.md ~/.codex/skills/
+
+# 3. Configure credenciais (1x)
+gather-setup
+# Preenche: BOT_MONITOR_URL/KEY, LIGHTBULB_URL/KEY, INBOX_URL/KEY
+# Keys: painel Gather → Smart Object → ⋮ → Regenerate token (whsec_... aparece 1x)
+
+# 4. Verifique
+gather-test all  # 3/3 OK
+```
+
+---
+
+## FLUXO OBRIGATÓRIO DO AGENTE
+
+### REGRA 1 — Ping antes de tudo
+```bash
+gather-bot ping  # ou gather-test all
+# Se NÃO 200 → PARE. Corrija .env/secret/URL. Não prossiga.
+```
+
+### REGRA 2 — Atualize após CADA ação real (após ping 200)
+
+| Sua ação | Comando OBRIGATÓRIO |
+|----------|---------------------|
+| Iniciou tarefa/coding | `gather-bot add "task: <nome>" --status timer` |
+| Concluiu tarefa | `gather-bot add "task: <nome>" --status on` |
+| Travou/dependência | `gather-bot add "task: <nome>" --status alert` |
+| Precisa input | `gather-bot add "task: <nome>" --status question` |
+| Usuário em call | `gather-light on --color red` |
+| Usuário livre/foco | `gather-light on --color green` |
+| Usuário ausente | `gather-light on --color yellow` |
+| Nova pendência | `gather-inbox add "descrição"` |
+| Fez pendência inbox | `gather-inbox set --level <novo_total>` |
+
+**Harness:** `plan`/`ask` = aprove **antes** da ação; `auto`/`default` = execute ação + update (após ping OK).
+
+---
+
+## ERROS — BLOQUEADORES
+
+| Código | Ação IMEDIATA |
+|--------|---------------|
+| `400`/`415` | Corrija payload; não reenvie igual |
+| `404 not_found` | `gather-bot ping` → confira `.env`; veja capabilities no `pong` |
+| `404 capability_not_declared` | Rode `ping` → veja capabilities reais |
+| `410 token_revoked` | Novo `whsec_...` no painel → `.env` |
+| `429` | Aguarde `RateLimit-Reset` segs; não burst |
+| `503` | Retry com backoff + `Retry-After` |
+
+---
+
+## FORMATAÇÃO
+- **Markdown NÃO funciona** → texto simples + emojis: ✅ 🔴 ⚠️ ❓ 🟢
+
+---
+
+## COMANDOS
+```
+gather-bot ping
+gather-bot add "msg" --status timer|on|alert|question|working|off
+gather-bot list
+
+gather-light on --color green|red|yellow
+gather-light off --color green|red|yellow
+
+gather-inbox add "tarefa"
+gather-inbox set --level N
+gather-inbox list
+
+gather-test all
+gather-setup
+```
+
+---
+
+**Repo:** https://github.com/sm1g00l/gather-smart-cli

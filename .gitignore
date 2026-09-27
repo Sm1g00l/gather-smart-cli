@@ -3,4 +3,6 @@ __pycache__/
 .env
 bot_messages.json
 tasks.json
+test_inboxes.json
+.coverage
 .venv/

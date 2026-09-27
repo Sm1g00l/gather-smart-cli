@@ -2,6 +2,7 @@ import click
 import json
 import os
 import base64
+import uuid
 from pathlib import Path
 from dotenv import load_dotenv
 from gather_cli.webhook import get_secret_bytes, sign_and_post
@@ -132,7 +133,7 @@ def set(level):
 @click.option("--to", "target", default=None, help="Enviar para inbox específico (nome salvo no config)")
 def add(message, target):
     url, secret = _resolve_inbox(target)
-    payload = {"type": "activity.add", "data": {"id": f"task_{len(message)}", "text": message[:500]}}
+    payload = {"type": "activity.add", "data": {"id": f"task_{uuid.uuid4().hex[:12]}", "text": message[:500]}}
     try:
         resp = sign_and_post(url, secret, payload)
         if resp.status_code == 404:

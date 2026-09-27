@@ -1,6 +1,7 @@
 import click
 import json
 import os
+import uuid
 from pathlib import Path
 from dotenv import load_dotenv
 from gather_cli.webhook import get_secret_bytes, sign_and_post
@@ -32,8 +33,11 @@ def ping():
 
 @cli.command()
 @click.argument("message", required=False)
-@click.option("--status", default="timer", type=click.Choice(["timer", "on", "question", "alert", "working", "off"]))
+@click.option("--status", default="working", type=click.Choice(["timer", "on", "question", "alert", "working", "off"]))
 def add(message, status):
+    # "timer" não é um estado aceito pelo Gather (400 invalid_args); mantido como alias de "working"
+    if status == "timer":
+        status = "working"
     secret = get_secret_bytes("BOT_MONITOR_KEY")
     url = os.getenv("BOT_MONITOR_URL", "")
     if not url or not secret:
@@ -41,6 +45,8 @@ def add(message, status):
         return
     payload = {"type": "status.set", "data": {"state": status}}
     try:
+        if message:
+            sign_and_post(url, secret, {"type": "activity.add", "data": {"id": f"msg_{uuid.uuid4().hex[:12]}", "text": message[:500]}})
         resp = sign_and_post(url, secret, payload)
         if resp.status_code == 404:
             click.echo(f"Webhook 404 (endpoint inacessível) — assinatura válida. Estado: {status}")
@@ -59,6 +65,21 @@ def add(message, status):
         messages = messages[-5:]
     MESSAGES_FILE.write_text(json.dumps(messages, indent=2))
     click.echo(f"Bot Monitor local: {msg_text} -> {status}")
+
+@cli.command()
+def clear():
+    secret = get_secret_bytes("BOT_MONITOR_KEY")
+    url = os.getenv("BOT_MONITOR_URL", "")
+    if not url or not secret:
+        click.echo("Erro: BOT_MONITOR_URL ou BOT_MONITOR_KEY não configurados")
+        return
+    try:
+        resp = sign_and_post(url, secret, {"type": "activity.clear", "data": {}})
+        click.echo(f"Bot Monitor: mensagens limpas (status: {resp.status_code})")
+    except Exception as e:
+        click.echo(f"Erro webhook: {e}")
+    if MESSAGES_FILE.exists():
+        MESSAGES_FILE.write_text(json.dumps([], indent=2))
 
 @cli.command(name="list")
 def list_messages():

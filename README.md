@@ -63,12 +63,13 @@ Deve sair:
 
 ### Bot Monitor — tarefas do agente
 ```bash
-gather-bot add "task: refatorar auth" --status timer   # iniciou
+gather-bot add "task: refatorar auth" --status working   # iniciou
 gather-bot add "task: refatorar auth" --status on      # concluiu
 gather-bot add "task: refatorar auth" --status alert   # bloqueado
 gather-bot add "task: refatorar auth" --status question # dúvida
 gather-bot ping                                        # testa conexão
 gather-bot list                                        # histórico local
+gather-bot clear                                       # limpa as mensagens do bot
 ```
 
 ### Lightbulb — presença do usuário

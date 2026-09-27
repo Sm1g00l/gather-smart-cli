@@ -17,8 +17,9 @@ def on(color):
     if not url or not secret:
         click.echo("Erro: LIGHTBULB_URL ou LIGHTBULB_KEY não configurados")
         return
-    payload = {"type": "switch.set_state", "data": {"on": True}, "variant_color": color}
+    payload = {"type": "switch.set_state", "data": {"on": True}}
     try:
+        sign_and_post(url, secret, {"type": "variant.set", "data": {"color": color}})
         resp = sign_and_post(url, secret, payload)
         if resp.status_code == 404:
             click.echo(f"Webhook 404 (endpoint inacessível). Lightbulb {color} -> ON")
@@ -35,8 +36,9 @@ def off(color):
     if not url or not secret:
         click.echo("Erro: LIGHTBULB_URL ou LIGHTBULB_KEY não configurados")
         return
-    payload = {"type": "switch.set_state", "data": {"on": False}, "variant_color": color}
+    payload = {"type": "switch.set_state", "data": {"on": False}}
     try:
+        sign_and_post(url, secret, {"type": "variant.set", "data": {"color": color}})
         resp = sign_and_post(url, secret, payload)
         if resp.status_code == 404:
             click.echo(f"Webhook 404. Lightbulb {color} -> OFF")

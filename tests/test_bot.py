@@ -110,4 +110,24 @@ def test_bot_add_all_statuses():
                 result = runner.invoke(cli, ["add", f"tarefa {status}", "--status", status])
             assert result.exit_code == 0
             data = json.loads(Path("bot_messages.json").read_text())
-            assert data[0]["status"] == status
+            assert data[0]["status"] == ("working" if status == "timer" else status)
+
+def test_bot_add_sends_message_as_activity():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with mock.patch("gather_cli.webhook.requests.post") as m:
+            m.return_value.status_code = 200
+            result = runner.invoke(cli, ["add", "task: X", "--status", "on"])
+        assert result.exit_code == 0
+        types = [json.loads(c.kwargs["data"])["type"] for c in m.call_args_list]
+        assert types == ["activity.add", "status.set"]
+        assert json.loads(m.call_args_list[0].kwargs["data"])["data"]["text"] == "task: X"
+
+def test_bot_clear():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with mock.patch("gather_cli.webhook.requests.post") as m:
+            m.return_value.status_code = 200
+            result = runner.invoke(cli, ["clear"])
+        assert result.exit_code == 0
+        assert json.loads(m.call_args.kwargs["data"])["type"] == "activity.clear"

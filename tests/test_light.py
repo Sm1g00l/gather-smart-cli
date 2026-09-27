@@ -86,3 +86,13 @@ def test_light_all_colors():
             result = runner.invoke(cli, ["off", "--color", color])
         assert result.exit_code == 0
         assert f"{color} -> OFF" in result.output
+
+def test_light_on_sets_variant_color():
+    from click.testing import CliRunner
+    from gather_cli.light import cli
+    with mock.patch("gather_cli.webhook.requests.post") as m:
+        m.return_value.status_code = 200
+        result = CliRunner().invoke(cli, ["on", "--color", "red"])
+    assert result.exit_code == 0
+    first = json.loads(m.call_args_list[0].kwargs["data"])
+    assert first["type"] == "variant.set" and first["data"]["color"] == "red"

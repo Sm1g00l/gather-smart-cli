@@ -30,7 +30,7 @@ gather-bot ping  # ou gather-test all
 
 | Sua ação | Comando OBRIGATÓRIO |
 |----------|---------------------|
-| Iniciou tarefa/coding | `gather-bot add "task: <nome>" --status timer` |
+| Iniciou tarefa/coding | `gather-bot add "task: <nome>" --status working` |
 | Concluiu tarefa | `gather-bot add "task: <nome>" --status on` |
 | Travou/dependência externa | `gather-bot add "task: <nome>" --status alert` |
 | Precisa input do usuário | `gather-bot add "task: <nome>" --status question` |
@@ -80,8 +80,9 @@ gather-inbox config default meu
 ## COMANDOS RÁPIDOS
 ```
 gather-bot ping
-gather-bot add "msg" --status timer|on|alert|question|working|off
+gather-bot add "msg" --status working|on|alert|question|working|off
 gather-bot list
+gather-bot clear
 
 gather-light on --color green|red|yellow
 gather-light off --color green|red|yellow

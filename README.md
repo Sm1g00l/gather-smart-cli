@@ -71,16 +71,19 @@ O ping devolve o **estado vivo** de cada objeto (`status.state`, `activity.entri
 
 ### Bot Monitor — tarefas do agente
 ```bash
-gather-bot add "task: refatorar auth" --status working  # iniciou
-gather-bot add "task: refatorar auth" --status on       # concluiu
-gather-bot add "task: refatorar auth" --status alert    # bloqueado
-gather-bot add "task: refatorar auth" --status question # dúvida
-gather-bot add --status off                             # só o estado, sem mensagem
-gather-bot ping                                         # testa conexão
+gather-bot show                                                   # estado + atividades com id (ao vivo)
+gather-bot add "🔄 refatorar auth" --status working --id t-auth    # iniciou
+gather-bot add "❓ refatorar auth: qual lib?" --status question --id t-auth  # dúvida (edita a mesma entrada)
+gather-bot add "⚠️ refatorar auth: CI fora" --status alert --id t-auth       # bloqueado
+gather-bot add "✅ refatorar auth" --status on --id t-auth         # concluiu
+gather-bot add --status off                                       # só o estado, sem mensagem
+gather-bot remove t-auth                                          # remove uma atividade
+gather-bot ping                                                   # testa conexão
 gather-bot list                                         # histórico local
 gather-bot clear                                        # limpa as mensagens do bot
 ```
 - O **estado** vira o ícone; o **texto** vira uma entrada de atividade no objeto.
+- Com `--id`, o `add` **edita** a entrada daquela chave (ou cria, se não existir). Sem `--id`, cria uma entrada nova a cada chamada.
 - Estados aceitos pelo Gather: `working`, `on`, `question`, `alert`, `off`. `timer` é aceito como alias de `working` (o Gather rejeita `timer` com `400`).
 - `list` mostra o histórico local (`bot_messages.json`, gravado no diretório atual).
 
@@ -95,7 +98,10 @@ Cores que a lâmpada aceita: `green`, `red`, `orange`. `yellow` vira `orange`: o
 
 ### Inbox — fila de pendentes
 ```bash
-gather-inbox add "revisar PR #42"          # cada tarefa ganha um id único
+gather-inbox show                          # pendências com id + contador (ao vivo)
+gather-inbox add "revisar PR #42" --id p-pr-42          # cria ou edita pela chave
+gather-inbox add "revisar PR #42 (2 comentários)" --id p-pr-42   # edita, não duplica
+gather-inbox add "revisar PR #43"          # sem --id: id aleatório, sempre cria
 gather-inbox set --level 3                 # contador do objeto
 gather-inbox remove <task_id>              # id aparece no gather-test all / list
 gather-inbox clear                         # remove todas as tarefas
@@ -111,6 +117,17 @@ gather-inbox config remove joao
 gather-inbox add "tarefa para o João" --to joao
 ```
 Os inboxes salvos ficam em `~/.config/gather-cli/inboxes.json` (chmod 600). Sem nenhum salvo, vale `INBOX_URL`/`INBOX_KEY` do `.env`.
+
+---
+
+## ✏️ Ler para editar (limite de 20 atividades)
+O Gather guarda **no máximo 20 atividades** por objeto (bot e inbox); da 21ª em diante a mais antiga **some sem aviso**. Ele também não tem evento de edição, e `activity.add` com um id que já existe é **ignorado**.
+
+Por isso o fluxo recomendado (e o das skills) é:
+1. `show` para ler o que já está lá;
+2. se já existe entrada do mesmo assunto, `add ... --id <id dela>` para editar (a CLI faz `remove` + `add`; a entrada vai para o fim);
+3. só crie entrada nova quando o assunto for novo, com uma chave estável (`t-<slug>` no bot, `p-<slug>` na inbox);
+4. pendência resolvida: `gather-inbox remove <id>`, não um novo `add`.
 
 ---
 
@@ -163,6 +180,12 @@ Use **texto simples + emojis**: ✅ 🔴 ⚠️ ❓ 🟢
 ---
 
 ## 📝 Changelog
+
+### Não lançado
+- `gather-bot show` e `gather-inbox show [--to]`: leem o estado vivo (atividades com id, estado/contador, uso do limite de 20).
+- `--id <chave>` em `gather-bot add` e `gather-inbox add`: edita a entrada da chave em vez de criar outra.
+- `gather-bot remove <id>`.
+- Skills e PROMPT: fluxo "ler para editar" (uma tarefa = uma entrada).
 
 ### 0.2.5
 Tudo validado contra os Smart Objects reais (ver `tests/test_e2e.py`).

@@ -97,3 +97,29 @@ def rate_limit_info(resp: requests.Response) -> dict:
     if info["retry_after"] is None:
         info["retry_after"] = as_int("RateLimit-Reset")
     return info
+
+
+# O Gather guarda no máximo 20 atividades por objeto; a mais antiga sai sem aviso
+ACTIVITY_LIMIT = 20
+
+
+def fetch_capabilities(url: str, secret_bytes: bytes) -> dict:
+    """Estado vivo do objeto (o pong do webhook.ping traz as capabilities)."""
+    resp = sign_and_post(url, secret_bytes, {"type": "webhook.ping"})
+    if resp.status_code != 200:
+        raise RuntimeError(f"ping {resp.status_code}: {resp.text[:200]}")
+    return resp.json().get("capabilities", {})
+
+
+def upsert_activity(url: str, secret_bytes: bytes, entry_id: str, text: str) -> requests.Response:
+    """Cria ou edita a atividade `entry_id`. O Gather não tem evento de edição e ignora
+    activity.add com id repetido; remove (200 mesmo se não existir) + add resolve."""
+    sign_and_post(url, secret_bytes, {"type": "activity.remove", "data": {"id": entry_id}})
+    return sign_and_post(url, secret_bytes, {"type": "activity.add", "data": {"id": entry_id, "text": text[:500]}})
+
+
+def format_entries(caps: dict) -> list[str]:
+    entries = caps.get("activity", {}).get("entries", [])
+    lines = [f"  {e['id']} | {e['text']}" for e in entries]
+    lines.append(f"  ({len(entries)}/{ACTIVITY_LIMIT} atividades)")
+    return lines

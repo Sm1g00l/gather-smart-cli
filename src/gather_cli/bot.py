@@ -4,7 +4,7 @@ import os
 import uuid
 from pathlib import Path
 from dotenv import load_dotenv
-from gather_cli.webhook import get_secret_bytes, sign_and_post
+from gather_cli.webhook import fetch_capabilities, format_entries, get_secret_bytes, sign_and_post, upsert_activity
 
 load_dotenv()
 
@@ -34,7 +34,8 @@ def ping():
 @cli.command()
 @click.argument("message", required=False)
 @click.option("--status", default="working", type=click.Choice(["timer", "on", "question", "alert", "working", "off"]))
-def add(message, status):
+@click.option("--id", "entry_id", default=None, help="Chave estável da tarefa: com a mesma chave, edita a entrada em vez de criar outra")
+def add(message, status, entry_id):
     # "timer" não é um estado aceito pelo Gather (400 invalid_args); mantido como alias de "working"
     if status == "timer":
         status = "working"
@@ -45,7 +46,9 @@ def add(message, status):
         return
     payload = {"type": "status.set", "data": {"state": status}}
     try:
-        if message:
+        if message and entry_id:
+            upsert_activity(url, secret, entry_id, message)
+        elif message:
             sign_and_post(url, secret, {"type": "activity.add", "data": {"id": f"msg_{uuid.uuid4().hex[:12]}", "text": message[:500]}})
         resp = sign_and_post(url, secret, payload)
         if resp.status_code == 404:
@@ -65,6 +68,36 @@ def add(message, status):
         messages = messages[-5:]
     MESSAGES_FILE.write_text(json.dumps(messages, indent=2))
     click.echo(f"Bot Monitor local: {msg_text} -> {status}")
+
+def _bot_credentials():
+    secret = get_secret_bytes("BOT_MONITOR_KEY")
+    url = os.getenv("BOT_MONITOR_URL", "")
+    if not url or not secret:
+        raise click.ClickException("BOT_MONITOR_URL ou BOT_MONITOR_KEY não configurados")
+    return url, secret
+
+@cli.command()
+def show():
+    """Lê o estado vivo do Bot Monitor (estado + atividades com id). Use antes de editar."""
+    url, secret = _bot_credentials()
+    try:
+        caps = fetch_capabilities(url, secret)
+    except Exception as e:
+        raise click.ClickException(str(e))
+    click.echo(f"Estado: {caps.get('status', {}).get('state', '-')}")
+    for line in format_entries(caps):
+        click.echo(line)
+
+@cli.command()
+@click.argument("entry_id")
+def remove(entry_id):
+    """Remove uma atividade do Bot Monitor pelo id."""
+    url, secret = _bot_credentials()
+    try:
+        resp = sign_and_post(url, secret, {"type": "activity.remove", "data": {"id": entry_id}})
+        click.echo(f"Bot Monitor: atividade removida: {entry_id} (status: {resp.status_code})")
+    except Exception as e:
+        click.echo(f"Erro webhook: {e}")
 
 @cli.command()
 def clear():

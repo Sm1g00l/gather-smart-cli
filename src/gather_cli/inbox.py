@@ -5,7 +5,7 @@ import base64
 import uuid
 from pathlib import Path
 from dotenv import load_dotenv
-from gather_cli.webhook import get_secret_bytes, sign_and_post
+from gather_cli.webhook import fetch_capabilities, format_entries, get_secret_bytes, sign_and_post, upsert_activity
 from gather_cli.inbox_config import get_config
 
 load_dotenv()
@@ -131,11 +131,15 @@ def set(level):
 @cli.command()
 @click.argument("message")
 @click.option("--to", "target", default=None, help="Enviar para inbox específico (nome salvo no config)")
-def add(message, target):
+@click.option("--id", "entry_id", default=None, help="Chave estável: com a mesma chave, edita a pendência em vez de criar outra")
+def add(message, target, entry_id):
     url, secret = _resolve_inbox(target)
-    payload = {"type": "activity.add", "data": {"id": f"task_{uuid.uuid4().hex[:12]}", "text": message[:500]}}
+    payload = {"type": "activity.add", "data": {"id": entry_id or f"task_{uuid.uuid4().hex[:12]}", "text": message[:500]}}
     try:
-        resp = sign_and_post(url, secret, payload)
+        if entry_id:
+            resp = upsert_activity(url, secret, entry_id, message)
+        else:
+            resp = sign_and_post(url, secret, payload)
         if resp.status_code == 404:
             click.echo(f"Webhook 404. Tarefa adicionada: {message}")
         else:
@@ -145,6 +149,8 @@ def add(message, target):
     tasks = []
     if TASKS_FILE.exists():
         tasks = json.loads(TASKS_FILE.read_text())
+    if entry_id:
+        tasks = [t for t in tasks if t.get("id") != entry_id]
     tasks.append({"msg": message, "id": payload["data"]["id"], "level": max([t.get("level", 0) for t in tasks] or [0]) + 1})
     TASKS_FILE.write_text(json.dumps(tasks, indent=2))
 
@@ -180,6 +186,19 @@ def clear():
         click.echo(f"Erro webhook: {e}")
     if TASKS_FILE.exists():
         TASKS_FILE.write_text(json.dumps([], indent=2))
+
+@cli.command()
+@click.option("--to", "target", default=None, help="Ler inbox específico (nome salvo no config)")
+def show(target):
+    """Lê o estado vivo do inbox (pendências com id + contador). Use antes de adicionar/editar."""
+    url, secret = _resolve_inbox(target)
+    try:
+        caps = fetch_capabilities(url, secret)
+    except Exception as e:
+        raise click.ClickException(str(e))
+    click.echo(f"Contador: {caps.get('counter', {}).get('count', '-')}")
+    for line in format_entries(caps):
+        click.echo(line)
 
 @cli.command(name="list")
 def list_tasks():

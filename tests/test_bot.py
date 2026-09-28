@@ -131,3 +131,40 @@ def test_bot_clear():
             result = runner.invoke(cli, ["clear"])
         assert result.exit_code == 0
         assert json.loads(m.call_args.kwargs["data"])["type"] == "activity.clear"
+
+
+def test_bot_add_with_id_edits_instead_of_adding():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with mock.patch("gather_cli.webhook.requests.post") as m:
+            m.return_value.status_code = 200
+            result = runner.invoke(cli, ["add", "✅ tarefa X", "--status", "on", "--id", "t-x"])
+        assert result.exit_code == 0
+        sent = [json.loads(c.kwargs["data"]) for c in m.call_args_list]
+        assert [p["type"] for p in sent] == ["activity.remove", "activity.add", "status.set"]
+        assert sent[0]["data"]["id"] == sent[1]["data"]["id"] == "t-x"
+        assert sent[1]["data"]["text"] == "✅ tarefa X"
+
+
+def test_bot_show_prints_live_entries():
+    runner = CliRunner()
+    with mock.patch("gather_cli.webhook.requests.post") as m:
+        m.return_value.status_code = 200
+        m.return_value.headers = {}
+        m.return_value.json.return_value = {"capabilities": {
+            "status": {"state": "working"},
+            "activity": {"entries": [{"id": "t-x", "text": "🔄 tarefa X", "at": 1}]}}}
+        result = runner.invoke(cli, ["show"])
+    assert result.exit_code == 0, result.output
+    assert "Estado: working" in result.output
+    assert "t-x | 🔄 tarefa X" in result.output
+    assert "(1/20 atividades)" in result.output
+
+
+def test_bot_remove():
+    runner = CliRunner()
+    with mock.patch("gather_cli.webhook.requests.post") as m:
+        m.return_value.status_code = 200
+        result = runner.invoke(cli, ["remove", "t-x"])
+    assert result.exit_code == 0
+    assert json.loads(m.call_args.kwargs["data"]) ["data"] == {"id": "t-x"}

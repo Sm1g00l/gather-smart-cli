@@ -74,7 +74,7 @@ def snapshot_and_restore():
     for url_env, key_env in OBJECTS.values():
         if not os.getenv(url_env) or not os.getenv(key_env):
             pytest.skip(f"{url_env}/{key_env} ausentes no .env")
-    # Cota do space: se não sobra o suficiente para a suíte (~52 req), espera a janela virar
+    # Cota do space: se não sobra o suficiente para a suíte (~62 req; o que passar da cota a CLI espera via Retry-After), espera a janela virar
     probe = post("bot", {"type": "webhook.ping"})
     rl = rate_limit_info(probe)
     if rl["remaining"] is not None and rl["remaining"] < 55:
@@ -144,6 +144,17 @@ def test_bot_every_state_is_accepted(runner, status):
     assert caps["status"]["state"] == status
 
 
+def test_bot_add_with_id_edits_the_same_entry(runner):
+    run(runner, bot.cli, ["add", "🔄 e2e tarefa", "--status", "working", "--id", "e2e-task"])
+    run(runner, bot.cli, ["add", "✅ e2e tarefa", "--status", "on", "--id", "e2e-task"])
+    caps = wait_for("bot", lambda c: any(e["text"] == "✅ e2e tarefa" for e in entries(c)))
+    mine = [e["text"] for e in entries(caps) if e["id"] == "e2e-task"]
+    assert mine == ["✅ e2e tarefa"]
+    assert caps["status"]["state"] == "on"
+    out = run(runner, bot.cli, ["show"])
+    assert "e2e-task | ✅ e2e tarefa" in out
+
+
 def test_bot_clear(runner):
     run(runner, bot.cli, ["clear"])
     caps = wait_for("bot", lambda c: not entries(c))
@@ -189,3 +200,11 @@ def test_inbox_remove_and_counter(runner):
     caps = wait_for("inbox", lambda c: not entries(c) and c["counter"]["count"] == 2)
     assert entries(caps) == []
     assert caps["counter"]["count"] == 2
+
+
+def test_inbox_add_with_id_edits_the_same_entry(runner):
+    run(runner, inbox.cli, ["clear"])
+    run(runner, inbox.cli, ["add", "e2e pendência", "--id", "e2e-pend"])
+    run(runner, inbox.cli, ["add", "e2e pendência (editada)", "--id", "e2e-pend"])
+    caps = wait_for("inbox", lambda c: any(e["text"] == "e2e pendência (editada)" for e in entries(c)))
+    assert [(e["id"], e["text"]) for e in entries(caps)] == [("e2e-pend", "e2e pendência (editada)")]

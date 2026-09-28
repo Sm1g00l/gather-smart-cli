@@ -26,20 +26,30 @@ gather-bot ping  # ou gather-test all
 # Se NÃO 200 → PARE. Corrija .env/secret/URL. Não prossiga.
 ```
 
-### 3. Após CADA ação de trabalho real — ATUALIZE IMEDIATAMENTE (após ping 200)
+### 3. LER PARA EDITAR — não sair adicionando
+
+O Bot Monitor é um **quadro de estado das tarefas**, não um log: **uma tarefa = uma entrada**, editada a cada transição pelo mesmo `--id`.
+- O Gather guarda no máximo **20 atividades** por objeto (bot e inbox); da 21ª em diante a mais antiga some sem aviso.
+- Não há evento de edição e `activity.add` com id repetido é ignorado; `--id` faz `remove` + `add`.
+- Antes de começar uma tarefa: `gather-bot show` (estado + entradas com id). Já existe entrada do mesmo assunto → reutilize o id dela. Várias → mantenha uma, remova as outras (`gather-bot remove <id>`). Nenhuma → id novo e estável `t-<slug>`.
+- O texto é o estado atual da tarefa (reescreva, não acrescente). Subtarefas não ganham entrada.
+- Com 15+ entradas, remova ✅ antigas até ~10.
+
+### 4. Nas TRANSIÇÕES da tarefa (após ping 200), sempre com o mesmo `--id`
 
 | Sua ação | Comando OBRIGATÓRIO |
 |----------|---------------------|
-| Iniciou tarefa/coding | `gather-bot add "task: <nome>" --status working` |
-| Concluiu tarefa | `gather-bot add "task: <nome>" --status on` |
-| Travou/dependência externa | `gather-bot add "task: <nome>" --status alert` |
-| Precisa input do usuário | `gather-bot add "task: <nome>" --status question` |
+| Iniciou/retomou tarefa | `gather-bot add "🔄 <tarefa>" --status working --id t-<slug>` |
+| Precisa input do usuário | `gather-bot add "❓ <tarefa>: <o que precisa>" --status question --id t-<slug>` |
+| Travou/dependência externa | `gather-bot add "⚠️ <tarefa>: <motivo>" --status alert --id t-<slug>` |
+| Concluiu tarefa | `gather-bot add "✅ <tarefa>: <resultado>" --status on --id t-<slug>` |
 | Usuário em call/reunião | `gather-light on --color red` |
 | Usuário livre/foco | `gather-light on --color green` |
 | Usuário ausente/almoço | `gather-light on --color orange` |
-| Nova pendência (seu inbox) | `gather-inbox add "descrição"` |
-| Nova pendência (inbox do colega) | `gather-inbox add "descrição" --to colega` |
-| Fez pendência do inbox | `gather-inbox set --level <novo_total>` |
+| Nova pendência (ler antes: `gather-inbox show`) | `gather-inbox add "descrição" --id p-<slug>` |
+| Pendência mudou | `gather-inbox add "novo texto" --id <id existente>` |
+| Nova pendência (inbox do colega) | `gather-inbox add "descrição" --id p-<slug> --to colega` |
+| Resolveu pendência | `gather-inbox remove <id>` e `gather-inbox set --level <pendências restantes>` |
 
 ### Multi-inbox (v0.2.0)
 ```bash
@@ -80,14 +90,17 @@ gather-inbox config default meu
 ## COMANDOS RÁPIDOS
 ```
 gather-bot ping
-gather-bot add "msg" --status working|on|alert|question|working|off
+gather-bot show                      # estado + entradas com id (LER antes de editar)
+gather-bot add "msg" --status working|on|alert|question|off --id t-<slug>
+gather-bot remove <id>
 gather-bot list
 gather-bot clear
 
 gather-light on --color green|red|orange
 gather-light off --color green|red|orange
 
-gather-inbox add "tarefa" [--to nome]
+gather-inbox show [--to nome]        # pendências com id + contador
+gather-inbox add "tarefa" --id p-<slug> [--to nome]
 gather-inbox config add <nome> --url <url> --key whsec_... [--owner <nome>]
 gather-inbox config list
 gather-inbox config remove <nome>

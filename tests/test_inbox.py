@@ -277,3 +277,31 @@ def test_inbox_set_level():
             result = runner.invoke(cli, ["set", "--level", "5"])
         assert result.exit_code == 0
         assert "nível definido: 5" in result.output.lower()
+
+def test_inbox_add_with_id_edits_instead_of_adding():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with mock.patch("gather_cli.webhook.requests.post") as m:
+            m.return_value.status_code = 200
+            runner.invoke(cli, ["add", "revisar PR #42", "--id", "pr-42"])
+            result = runner.invoke(cli, ["add", "revisar PR #42 (2 comentários)", "--id", "pr-42"])
+        assert result.exit_code == 0
+        sent = [json.loads(c.kwargs["data"]) for c in m.call_args_list]
+        assert [p["type"] for p in sent] == ["activity.remove", "activity.add"] * 2
+        assert {p["data"]["id"] for p in sent} == {"pr-42"}
+        tasks = json.loads(Path("tasks.json").read_text())
+        assert [(t["id"], t["msg"]) for t in tasks] == [("pr-42", "revisar PR #42 (2 comentários)")]
+
+
+def test_inbox_show_prints_live_entries():
+    runner = CliRunner()
+    with mock.patch("gather_cli.webhook.requests.post") as m:
+        m.return_value.status_code = 200
+        m.return_value.headers = {}
+        m.return_value.json.return_value = {"capabilities": {
+            "counter": {"count": 1},
+            "activity": {"entries": [{"id": "pr-42", "text": "revisar PR #42", "at": 1}]}}}
+        result = runner.invoke(cli, ["show"])
+    assert result.exit_code == 0, result.output
+    assert "Contador: 1" in result.output
+    assert "pr-42 | revisar PR #42" in result.output

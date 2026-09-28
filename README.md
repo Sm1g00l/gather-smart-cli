@@ -2,7 +2,7 @@
 
 CLI para atualizar Smart Objects do Gather Town via webhooks assinados (Standard Webhooks v1).
 
-**Versão atual: 0.2.5** — veja o [changelog](#-changelog).
+**Versão atual: 0.2.6** — histórico de mudanças no [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -21,7 +21,7 @@ CLI para atualizar Smart Objects do Gather Town via webhooks assinados (Standard
 ```bash
 git clone https://github.com/sm1g00l/gather-smart-cli
 cd gather-smart-cli
-git checkout v0.2.5   # opcional: fixa a versão
+git checkout v0.2.6   # opcional: fixa a versão
 pip install -e .
 ```
 
@@ -176,29 +176,6 @@ Use **texto simples + emojis**: ✅ 🔴 ⚠️ ❓ 🟢
 | `410 token_revoked` | Token regenerado no painel | Copie novo `whsec_...` pro `.env` |
 | `429 rate_limited` | 60 req/min/space ou 100/min/IP | A CLI espera sozinha `Retry-After` + 2s e reenvia (teto: `GATHER_MAX_WAIT`, padrão 150s) |
 | `503` | Transitório | Com `Retry-After`, a CLI espera e reenvia; sem ele, tente de novo depois |
-
----
-
-## 📝 Changelog
-
-### Não lançado
-- `gather-bot show` e `gather-inbox show [--to]`: leem o estado vivo (atividades com id, estado/contador, uso do limite de 20).
-- `--id <chave>` em `gather-bot add` e `gather-inbox add`: edita a entrada da chave em vez de criar outra.
-- `gather-bot remove <id>`.
-- Skills e PROMPT: fluxo "ler para editar" (uma tarefa = uma entrada).
-
-### 0.2.5
-Tudo validado contra os Smart Objects reais (ver `tests/test_e2e.py`).
-- **Bot Monitor:** o texto do `add` agora chega ao Gather (como atividade); antes só ia pro arquivo local.
-- **Bot Monitor:** `timer` (antigo padrão) era rejeitado com `400`; padrão agora é `working`, `timer` virou alias.
-- **Bot Monitor:** novo `gather-bot clear`.
-- **Lightbulb:** `--color` era ignorado; agora envia `variant.set`. Nova cor `orange`; `yellow` (que o Gather ignora) virou alias de `orange`.
-- **Inbox:** id da tarefa era `task_<tamanho do texto>` e colidia; agora é único.
-- **Rate limit:** a CLI respeita `Retry-After` no `429` e reenvia (teto `GATHER_MAX_WAIT`); `gather-test all` mostra a cota restante.
-- **Testes:** suíte e2e opcional (`GATHER_E2E=1 pytest -m e2e`) com snapshot e restauração do estado.
-
-### 0.2.0
-- Multi-inbox (`gather-inbox config ...`, `--to`), `gather-inbox remove` e `clear`.
 
 ---
 
